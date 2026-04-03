@@ -14,7 +14,7 @@ from flask_sqlalchemy import SQLAlchemy
 # ─────────────────────────────────────────────
 app = Flask(__name__)
 
-# Database URL Handling (SQLAlchemy 1.4+ needs 'postgresql://' not 'postgres://')
+# Fix for Render's Postgres URL requirement (SQLAlchemy 1.4+ needs 'postgresql://')
 DB_URL = os.getenv(
     'DATABASE_URL', 
     'postgresql://blood_donor_db_al97_user:q4IXPrkgVvQgg3D85H5w6Rba0rtOACnp@dpg-d77uu6ia214c73dkd1fg-a/blood_donor_db_al97'
@@ -25,10 +25,12 @@ if DB_URL.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JSON_SORT_KEYS'] = False
-JWT_SECRET = os.getenv('JWT_SECRET', 'emergency-secret-key-123')
+# Use a default secret for now, but in Render Env vars, set a real JWT_SECRET
+JWT_SECRET = os.getenv('JWT_SECRET', 'emergency-secret-key-123-blood-app')
 
 db = SQLAlchemy(app)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Allow CORS for all routes (important for frontend communication)
+CORS(app)
 
 # Clinic location (Sitaram Clinic, Coimbatore)
 CLINIC = {'name': 'Sitaram Clinic', 'lat': 11.0026, 'lng': 76.9969, 'city': 'Coimbatore'}
@@ -40,7 +42,7 @@ class Donor(db.Model):
     __tablename__ = 'donors'
     id             = db.Column(db.Integer, primary_key=True)
     name           = db.Column(db.String(100), nullable=False)
-    blood_group    = db.Column(db.String(3),   nullable=False)
+    blood_group    = db.Column(db.String(5),   nullable=False)
     phone          = db.Column(db.String(15),  nullable=False, unique=True)
     address        = db.Column(db.String(500), nullable=False)
     latitude       = db.Column(db.Float, nullable=False)
@@ -72,34 +74,7 @@ class User(db.Model):
         return {'id': self.id, 'email': self.email, 'role': self.role}
 
 # ─────────────────────────────────────────────
-# 3. Database Initialization & Seeding
-# ─────────────────────────────────────────────
-def seed_data():
-    if Donor.query.first() is not None:
-        return
-    
-    sample_donors = [
-        {'name': 'Arjun Kumar',   'blood_group': 'O+', 'phone': '9876543210', 'address': 'RS Puram, Coimbatore',      'latitude': 11.0076, 'longitude': 76.9543},
-        {'name': 'Priya Sharma',  'blood_group': 'A+', 'phone': '9876543211', 'address': 'Gandhipuram, Coimbatore',   'latitude': 11.0168, 'longitude': 76.9558},
-        {'name': 'Ravi Shankar',  'blood_group': 'B+', 'phone': '9876543212', 'address': 'Peelamedu, Coimbatore',     'latitude': 11.0276, 'longitude': 77.0036},
-        {'name': 'Meera Nair',    'blood_group': 'AB+','phone': '9876543213', 'address': 'Saibaba Colony, Coimbatore','latitude': 11.0218, 'longitude': 76.9699},
-        {'name': 'Karan Singh',   'blood_group': 'O-', 'phone': '9876543214', 'address': 'Singanallur, Coimbatore',   'latitude': 10.9985, 'longitude': 77.0249},
-        {'name': 'Deepa Menon',   'blood_group': 'A-', 'phone': '9876543215', 'address': 'Vadavalli, Coimbatore',     'latitude': 11.0134, 'longitude': 76.9204},
-        {'name': 'Suresh Babu',   'blood_group': 'B-', 'phone': '9876543216', 'address': 'Ukkadam, Coimbatore',       'latitude': 10.9862, 'longitude': 76.9694},
-        {'name': 'Anita Patel',   'blood_group': 'AB-','phone': '9876543217', 'address': 'Kuniyamuthur, Coimbatore',  'latitude': 10.9756, 'longitude': 76.9564},
-    ]
-    for d in sample_donors:
-        db.session.add(Donor(**d))
-    db.session.commit()
-    print("✅ Database Seeded Successfully")
-
-# Initialize tables inside the app context (CRITICAL for Render/Postgres)
-with app.app_context():
-    db.create_all()
-    seed_data()
-
-# ─────────────────────────────────────────────
-# 4. Auth Helpers & Decorators
+# 3. Auth Helpers & Decorators
 # ─────────────────────────────────────────────
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -126,29 +101,33 @@ def token_required(f):
     def decorated(*args, **kwargs):
         auth = request.headers.get('Authorization', '')
         try:
+            # Format: "Bearer <token>"
             token = auth.split(' ')[1]
         except:
-            return jsonify({'success': False, 'message': 'Token missing'}), 401
+            return jsonify({'success': False, 'message': 'Authentication token missing'}), 401
+        
         decoded = verify_token(token)
         if not decoded:
-            return jsonify({'success': False, 'message': 'Invalid token'}), 401
+            return jsonify({'success': False, 'message': 'Invalid or expired token'}), 401
         return f(decoded, *args, **kwargs)
     return decorated
 
 # ─────────────────────────────────────────────
-# 5. Logic & Distance Helpers
+# 4. Logic & Distance Helpers
 # ─────────────────────────────────────────────
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371
+    R = 6371 # Earth radius in KM
     dLat, dLon = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
     a = math.sin(dLat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dLon/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 def find_nearest(clinic, donors, blood_group):
+    # Filter by blood group and availability
     candidates = [d for d in donors if d.availability and d.blood_group == blood_group]
     if not candidates:
-        return {'success': False, 'message': f'No available {blood_group} donors'}
+        return {'success': False, 'message': f'No available {blood_group} donors found.'}
 
+    # Sort by Haversine distance
     ranked = sorted(candidates, key=lambda d: haversine(clinic['lat'], clinic['lng'], d.latitude, d.longitude))
     best = ranked[0]
     dist = round(haversine(clinic['lat'], clinic['lng'], best.latitude, best.longitude), 2)
@@ -157,57 +136,106 @@ def find_nearest(clinic, donors, blood_group):
         'success': True,
         'donor': best.to_dict(),
         'distance': dist,
-        'travelTime': math.ceil((dist / 40) * 60),
+        'travelTime': math.ceil((dist / 40) * 60), # Approx 40km/h
         'alternatives': [{**d.to_dict(), 'distance': round(haversine(clinic['lat'], clinic['lng'], d.latitude, d.longitude), 2)} for d in ranked[1:4]]
     }
 
 # ─────────────────────────────────────────────
-# 6. API Routes
+# 5. API Routes
 # ─────────────────────────────────────────────
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST'], strict_slashes=False)
 def login():
     data = request.get_json() or {}
     email, password = data.get('email'), data.get('password')
+    
+    # Simple hardcoded Admin for your project
     if email == 'admin@clinic.com' and password == 'admin123':
         return jsonify({'success': True, 'token': generate_token(0, email), 'user': {'email': email, 'role': 'admin'}})
+    
     user = User.query.filter_by(email=email).first()
     if user and verify_password(password, user.password):
         return jsonify({'success': True, 'token': generate_token(user.id, user.email), 'user': user.to_dict()})
-    return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+    
+    return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
 
-@app.route('/api/donors', methods=['GET'])
+@app.route('/api/donors', methods=['GET'], strict_slashes=False)
 def get_donors():
     donors = Donor.query.all()
-    return jsonify({'success': True, 'donors': [d.to_dict() for d in donors]})
+    return jsonify({'success': True, 'count': len(donors), 'donors': [d.to_dict() for d in donors]})
 
-@app.route('/api/donors/search/nearest', methods=['POST'])
+@app.route('/api/donors', methods=['POST'], strict_slashes=False)
+def create_donor():
+    # Note: Removed @token_required so you can test adding donors without logging in
+    data = request.get_json() or {}
+    try:
+        new_donor = Donor(
+            name=data['name'],
+            blood_group=data['bloodGroup'],
+            phone=data['phone'],
+            address=data['address'],
+            latitude=float(data['latitude']),
+            longitude=float(data['longitude']),
+            availability=data.get('availability', True)
+        )
+        db.session.add(new_donor)
+        db.session.commit()
+        return jsonify({'success': True, 'donor': new_donor.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/donors/search/nearest', methods=['POST'], strict_slashes=False)
 def find_nearest_donor_api():
     data = request.get_json() or {}
     blood_group = data.get('bloodGroup')
     if not blood_group:
-        return jsonify({'success': False, 'message': 'Blood group required'}), 400
+        return jsonify({'success': False, 'message': 'Blood group is required'}), 400
+    
     donors = Donor.query.all()
     result = find_nearest(CLINIC, donors, blood_group)
     return jsonify(result)
 
-@app.route('/api/donors/statistics', methods=['GET'])
+@app.route('/api/donors/statistics', methods=['GET'], strict_slashes=False)
 def get_statistics():
+    total = Donor.query.count()
+    available = Donor.query.filter_by(availability=True).count()
     stats = {}
     for bg in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']:
         stats[bg] = {
             'total': Donor.query.filter_by(blood_group=bg).count(),
             'available': Donor.query.filter_by(blood_group=bg, availability=True).count()
         }
-    return jsonify({'success': True, 'totalDonors': Donor.query.count(), 'bloodGroupStats': stats})
+    return jsonify({'success': True, 'totalDonors': total, 'availableDonors': available, 'bloodGroupStats': stats})
 
 @app.route('/api/health')
 def health():
-    return jsonify({'status': 'OK'})
+    return jsonify({'status': 'OK', 'database': 'Connected' if db.engine else 'Down'})
+
+# ─────────────────────────────────────────────
+# 6. Database Initialization & Seeding
+# ─────────────────────────────────────────────
+def seed_data():
+    sample_donors = [
+        {'name': 'Arjun Kumar',   'blood_group': 'O+', 'phone': '9876543210', 'address': 'RS Puram, Coimbatore',      'latitude': 11.0076, 'longitude': 76.9543},
+        {'name': 'Priya Sharma',  'blood_group': 'A+', 'phone': '9876543211', 'address': 'Gandhipuram, Coimbatore',   'latitude': 11.0168, 'longitude': 76.9558},
+        {'name': 'Ravi Shankar',  'blood_group': 'B+', 'phone': '9876543212', 'address': 'Peelamedu, Coimbatore',     'latitude': 11.0276, 'longitude': 77.0036},
+        {'name': 'Meera Nair',    'blood_group': 'AB+','phone': '9876543213', 'address': 'Saibaba Colony, Coimbatore','latitude': 11.0218, 'longitude': 76.9699},
+        {'name': 'Karan Singh',   'blood_group': 'O-', 'phone': '9876543214', 'address': 'Singanallur, Coimbatore',   'latitude': 10.9985, 'longitude': 77.0249},
+    ]
+    for d in sample_donors:
+        if not Donor.query.filter_by(phone=d['phone']).first():
+            db.session.add(Donor(**d))
+    db.session.commit()
+    print("✅ Seeded sample data.")
+
+with app.app_context():
+    db.create_all()
+    seed_data()
 
 # ─────────────────────────────────────────────
 # 7. Start Server
