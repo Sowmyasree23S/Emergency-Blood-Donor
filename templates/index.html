@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Emergency Blood Donor Finder – Sitaram Clinic</title>
+<style>
+  :root{--red:#c0392b;--red-dark:#922b21;--red-light:#f1948a;--bg:#f8f9fa;--card:#fff;--text:#2c3e50;--muted:#7f8c8d;--border:#e0e0e0;--green:#27ae60;--orange:#e67e22;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  
+  /* ── Nav ── */
+  nav{background:var(--red);color:#fff;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+  .nav-brand{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:.5rem;}
+  .nav-links{display:flex;gap:.5rem;align-items:center;}
+  .nav-links button{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:.4rem .9rem;border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s;}
+  .nav-links button:hover{background:rgba(255,255,255,.3);}
+  #userInfo{font-size:.85rem;opacity:.9;}
+
+  /* ── Layout ── */
+  .container{max-width:1100px;margin:0 auto;padding:1.5rem;}
+  h2{font-size:1.3rem;margin-bottom:1rem;color:var(--text);}
+  
+  /* ── Cards ── */
+  .card{background:var(--card);border-radius:10px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem;}
+  
+  /* ── Stats ── */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;}
+  .stat-box{background:var(--card);border-radius:10px;padding:1.2rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+  .stat-box .num{font-size:2rem;font-weight:700;color:var(--red);}
+  .stat-box .label{font-size:.8rem;color:var(--muted);margin-top:.3rem;}
+
+  /* ── Blood group grid ── */
+  .bg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.6rem;margin-top:.8rem;}
+  .bg-box{border:1px solid var(--border);border-radius:8px;padding:.5rem;text-align:center;font-size:.8rem;}
+  .bg-box .bg-name{font-weight:700;font-size:1rem;color:var(--red);}
+  .bg-box .bg-avail{color:var(--green);font-weight:600;}
+
+  /* ── Emergency Search ── */
+  .search-bar{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center;}
+  select,input{padding:.6rem .9rem;border:1px solid var(--border);border-radius:8px;font-size:.95rem;outline:none;background:#fff;}
+  select:focus,input:focus{border-color:var(--red);}
+  .btn{padding:.6rem 1.3rem;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;transition:.2s;}
+  .btn-red{background:var(--red);color:#fff;} .btn-red:hover{background:var(--red-dark);}
+  .btn-green{background:var(--green);color:#fff;} .btn-green:hover{background:#1e8449;}
+  .btn-outline{background:#fff;color:var(--red);border:1.5px solid var(--red);} .btn-outline:hover{background:#fdf0f0;}
+  .btn-sm{padding:.35rem .75rem;font-size:.8rem;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* ── Result Box ── */
+  #resultBox{display:none;margin-top:1rem;}
+  .result-card{border:2px solid var(--red);border-radius:10px;padding:1.2rem;background:#fff8f8;}
+  .result-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;}
+  .donor-name{font-size:1.2rem;font-weight:700;color:var(--red);}
+  .badge{display:inline-block;padding:.25rem .6rem;border-radius:20px;font-size:.8rem;font-weight:700;}
+  .badge-red{background:#fde8e8;color:var(--red);}
+  .badge-green{background:#e8fdf0;color:var(--green);}
+  .info-row{display:flex;gap:1.5rem;flex-wrap:wrap;margin:1rem 0;font-size:.9rem;}
+  .info-item{display:flex;flex-direction:column;gap:.2rem;}
+  .info-item .lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;}
+  .info-item .val{font-weight:600;}
+  .alternatives{margin-top:1rem;}
+  .alternatives h4{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;}
+  .alt-item{background:#f9f9f9;border-radius:6px;padding:.6rem .9rem;margin-bottom:.4rem;font-size:.85rem;display:flex;justify-content:space-between;align-items:center;}
+
+  /* ── Donor Table ── */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;}
+  th{background:#f5f5f5;padding:.65rem .9rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);}
+  td{padding:.6rem .9rem;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:hover td{background:#fffaf9;}
+  .avail-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .dot-green{background:var(--green);} .dot-red{background:var(--red-light);}
+
+  /* ── Add Donor Form ── */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+  @media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+  .form-group{display:flex;flex-direction:column;gap:.4rem;}
+  .form-group label{font-size:.85rem;font-weight:600;color:var(--muted);}
+  .form-group input,.form-group select{width:100%;}
+  .form-full{grid-column:1/-1;}
+
+  /* ── Auth Modal ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;}
+  .modal-overlay.active{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:2rem;width:340px;max-width:95vw;box-shadow:0 8px 30px rgba(0,0,0,.2);}
+  .modal h3{margin-bottom:1.2rem;color:var(--red);}
+  .modal .form-group{margin-bottom:.8rem;}
+  .modal-footer{margin-top:1rem;text-align:center;font-size:.85rem;}
+  .modal-footer a{color:var(--red);cursor:pointer;text-decoration:underline;}
+
+  /* ── Toast ── */
+  #toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.7rem 1.2rem;border-radius:8px;color:#fff;font-size:.9rem;z-index:999;display:none;animation:slide-in .3s ease;}
+  @keyframes slide-in{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .toast-success{background:var(--green);} .toast-error{background:var(--red);} .toast-info{background:#2980b9;}
+
+  /* ── Tabs ── */
+  .tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap;}
+  .tab{padding:.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:.9rem;background:#fff;transition:.2s;}
+  .tab.active{background:var(--red);color:#fff;border-color:var(--red);}
+
+  /* ── Loader ── */
+  .loader{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.4rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .empty{text-align:center;padding:2rem;color:var(--muted);}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-brand">🩸 Emergency Blood Donor Finder</div>
+  <div class="nav-links">
+    <span id="userInfo"></span>
+    <button id="loginBtn" onclick="showLogin()">Login</button>
+    <button id="logoutBtn" class="hidden" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <h3 id="authTitle">Admin Login</h3>
+    <div class="form-group"><label>Email</label><input type="email" id="authEmail" placeholder="admin@clinic.com"/></div>
+    <div class="form-group"><label>Password</label><input type="password" id="authPassword" placeholder="••••••••"/></div>
+    <div style="display:flex;gap:.6rem;margin-top:1rem;">
+      <button class="btn btn-red" style="flex:1" onclick="doLogin()">Login</button>
+      <button class="btn btn-outline" style="flex:1" onclick="closeModal()">Cancel</button>
+    </div>
+    <div class="modal-footer">Admin credentials: admin@clinic.com / admin123</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-box"><div class="num" id="statTotal">–</div><div class="label">Total Donors</div></div>
+    <div class="stat-box"><div class="num" id="statAvail">–</div><div class="label">Available Now</div></div>
+    <div class="stat-box"><div class="num" id="statClinic">CBE</div><div class="label">Sitaram Clinic</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('search')">🔍 Emergency Search</div>
+    <div class="tab" onclick="showTab('donors')">👥 All Donors</div>
+    <div class="tab" onclick="showTab('add')" id="addTab">➕ Add Donor</div>
+    <div class="tab" onclick="showTab('blood')">📊 Blood Groups</div>
+  </div>
+
+  <!-- Tab: Emergency Search -->
+  <div id="tab-search">
+    <div class="card">
+      <h2>🚨 Find Nearest Donor (Emergency)</h2>
+      <div class="search-bar">
+        <select id="searchBG">
+          <option value="">Select Blood Group</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+        </select>
+        <button class="btn btn-red" id="searchBtn" onclick="searchDonor()">Search Nearest</button>
+      </div>
+      <div id="resultBox">
+        <div class="result-card" id="resultCard"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: All Donors -->
+  <div id="tab-donors" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <h2 style="margin:0">👥 Registered Donors</h2>
+        <input type="text" placeholder="Filter by name or blood group…" oninput="filterDonors(this.value)" style="width:220px"/>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Blood Group</th><th>Phone</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="donorTable"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Add Donor -->
+  <div id="tab-add" class="hidden">
+    <div class="card">
+      <h2>➕ Add New Donor</h2>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.2rem;">You must be logged in as admin to add donors.</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Full Name *</label><input id="fName" placeholder="Donor name"/></div>
+        <div class="form-group"><label>Blood Group *</label>
+          <select id="fBG">
+            <option value="">Select</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Phone (10 digits) *</label><input id="fPhone" placeholder="9876543210" maxlength="10"/></div>
+        <div class="form-group form-full"><label>Address *</label><input id="fAddress" placeholder="Street, Area, City"/></div>
+        <div class="form-group"><label>Latitude *</label><input id="fLat" placeholder="11.0026" type="number" step="any"/></div>
+        <div class="form-group"><label>Longitude *</label><input id="fLng" placeholder="76.9969" type="number" step="any"/></div>
+        <div class="form-group form-full" style="flex-direction:row;align-items:center;gap:.8rem;">
+          <input type="checkbox" id="fAvail" checked style="width:16px;height:16px;"/>
+          <label for="fAvail" style="font-size:.95rem;color:var(--text);">Available for donation</label>
+        </div>
+      </div>
+      <div style="margin-top:1.2rem;">
+        <button class="btn btn-red" onclick="addDonor()">Add Donor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Blood Groups -->
+  <div id="tab-blood" class="hidden">
+    <div class="card">
+      <h2>📊 Blood Group Statistics</h2>
+      <div class="bg-grid" id="bgGrid"><div class="empty" style="grid-column:1/-1">Loading…</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const API = '';  // same origin
+let token = localStorage.getItem('token') || null;
+let allDonors = [];
+
+// ── Utils ──────────────────────────────
+function toast(msg, type='info'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast-${type}`;
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3000);
+}
+
+function showTab(name){
+  ['search','donors','add','blood'].forEach(t=>{
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t!==name);
+  });
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.classList.toggle('active', ['search','donors','add','blood'][i]===name);
+  });
+  if(name==='donors') loadDonors();
+  if(name==='blood') loadBloodStats();
+}
+
+// ── Auth ──────────────────────────────
+function showLogin(){ document.getElementById('authModal').classList.add('active'); }
+function closeModal(){ document.getElementById('authModal').classList.remove('active'); }
+
+async function doLogin(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!email||!password){ toast('Fill in all fields','error'); return; }
+  try{
+    const r = await fetch(`${API}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d = await r.json();
+    if(d.success){
+      token = d.token;
+      localStorage.setItem('token', token);
+      updateAuthUI(d.user);
+      closeModal();
+      toast('Logged in successfully!','success');
+    } else {
+      toast(d.message,'error');
+    }
+  } catch(e){ toast('Login failed','error'); }
+}
+
+function logout(){
+  token = null;
+  localStorage.removeItem('token');
+  updateAuthUI(null);
+  toast('Logged out','info');
+}
+
+function updateAuthUI(user){
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const userInfo = document.getElementById('userInfo');
+  if(user){
+    loginBtn.classList.add('hidden');
+    logoutBtn.classList.remove('hidden');
+    userInfo.textContent = `👤 ${user.email}`;
+  } else {
+    loginBtn.classList.remove('hidden');
+    logoutBtn.classList.add('hidden');
+    userInfo.textContent = '';
+  }
+}
+
+// ── Stats ──────────────────────────────
+async function loadStats(){
+  try{
+    const r = await fetch(`${API}/api/donors/statistics`);
+    const d = await r.json();
+    if(d.success){
+      document.getElementById('statTotal').textContent = d.totalDonors;
+      document.getElementById('statAvail').textContent = d.availableDonors;
+    }
+  } catch(e){}
+}
+
+// ── Emergency Search ──────────────────
+async function searchDonor(){
+  const bg = document.getElementById('searchBG').value;
+  if(!bg){ toast('Select a blood group','error'); return; }
+  const btn = document.getElementById('searchBtn');
+  btn.innerHTML = '<span class="loader"></span>Searching…';
+  btn.disabled = true;
+  try{
+    const r = await fetch(`${API}/api/donors/search/nearest`,{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({bloodGroup:bg})
+    });
+    const d = await r.json();
+    displayResult(d);
+  } catch(e){ toast('Search failed','error'); }
+  btn.innerHTML = 'Search Nearest';
+  btn.disabled = false;
+}
+
+function displayResult(d){
+  const box = document.getElementById('resultBox');
+  const card = document.getElementById('resultCard');
+  box.style.display = 'block';
+  if(!d.success){
+    card.innerHTML = `<div class="empty" style="color:var(--red)">⚠️ ${d.message}</div>`;
+    return;
+  }
+  const donor = d.donor;
+  const alts = (d.alternatives||[]).map(a=>`
+    <div class="alt-item">
+      <span><strong>${a.name}</strong> · ${a.bloodGroup} · ${a.phone}</span>
+      <span style="color:var(--muted)">${a.distance} km · ${a.travelTime} min</span>
+    </div>`).join('');
+  card.innerHTML = `
+    <div class="result-header">
+      <div class="donor-name">🩸 ${donor.name}</div>
+      <span class="badge badge-red">${donor.bloodGroup}</span>
+    </div>
+    <div class="info-row">
+      <div class="info-item"><div class="lbl">Phone</div><div class="val">📞 ${donor.phone}</div></div>
+      <div class="info-item"><div class="lbl">Distance</div><div class="val">📍 ${d.distance} km</div></div>
+      <div class="info-item"><div class="lbl">Est. Travel</div><div class="val">⏱ ${d.travelTime} min</div></div>
+      <div class="info-item"><div class="lbl">Address</div><div class="val">${donor.address}</div></div>
+    </div>
+    <button class="btn btn-green btn-sm" onclick="markContacted(${donor.id})">✅ Mark as Contacted</button>
+    ${alts ? `<div class="alternatives"><h4>Alternative Donors:</h4>${alts}</div>` : ''}
+  `;
+}
+
+async function markContacted(id){
+  await fetch(`${API}/api/donors/${id}/contact`,{method:'PUT'});
+  toast('Donor marked as contacted','success');
+}
+
+// ── All Donors ──────────────────────────────
+async function loadDonors(){
+  try{
+    const r = await fetch(`${API}/api/donors`);
+    const d = await r.json();
+    if(d.success){ allDonors = d.donors; renderTable(allDonors); }
+  } catch(e){ toast('Failed to load donors','error'); }
+}
+
+function renderTable(donors){
+  const tbody = document.getElementById('donorTable');
+  if(!donors.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">No donors found</td></tr>'; return; }
+  tbody.innerHTML = donors.map(d=>`
+    <tr>
+      <td><strong>${d.name}</strong></td>
+      <td><span class="badge badge-red">${d.bloodGroup}</span></td>
+      <td>${d.phone}</td>
+      <td>${d.address}</td>
+      <td><span class="avail-dot ${d.availability?'dot-green':'dot-red'}"></span> ${d.availability?'Available':'Unavailable'}</td>
+      <td>
+        ${token?`<button class="btn btn-outline btn-sm" onclick="toggleAvail(${d.id},${d.availability})">${d.availability?'Mark Busy':'Mark Free'}</button>
+        <button class="btn btn-sm" style="background:#fde8e8;color:var(--red);margin-left:.3rem" onclick="deleteDonor(${d.id})">Delete</button>`:'–'}
+      </td>
+    </tr>`).join('');
+}
+
+function filterDonors(q){
+  q = q.toLowerCase();
+  renderTable(allDonors.filter(d=>d.name.toLowerCase().includes(q)||d.bloodGroup.toLowerCase().includes(q)));
+}
+
+async function toggleAvail(id, current){
+  if(!token){ toast('Login required','error'); return; }
+  await fetch(`${API}/api/donors/${id}`,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({availability:!current})});
+  toast('Updated','success');
+  loadDonors();
+}
+
+async function deleteDonor(id){
+  if(!token){ toast('Login required','error'); return; }
+  if(!confirm('Delete this donor?')) return;
+  const r = await fetch(`${API}/api/donors/${id}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
+  const d = await r.json();
+  if(d.success){ toast('Donor deleted','success'); loadDonors(); }
+  else toast(d.message,'error');
+}
+
+// ── Add Donor ──────────────────────────────
+async function addDonor(){
+  if(!token){ toast('Login required to add donors','error'); showLogin(); return; }
+  const body = {
+    name: document.getElementById('fName').value.trim(),
+    bloodGroup: document.getElementById('fBG').value,
+    phone: document.getElementById('fPhone').value.trim(),
+    address: document.getElementById('fAddress').value.trim(),
+    latitude: parseFloat(document.getElementById('fLat').value),
+    longitude: parseFloat(document.getElementById('fLng').value),
+    availability: document.getElementById('fAvail').checked
+  };
+  if(!body.name||!body.bloodGroup||!body.phone||!body.address||isNaN(body.latitude)||isNaN(body.longitude)){
+    toast('Fill all required fields','error'); return;
+  }
+  try{
+    const r = await fetch(`${API}/api/donors`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(body)});
+    const d = await r.json();
+    if(d.success){ toast('Donor added!','success'); ['fName','fPhone','fAddress','fLat','fLng'].forEach(id=>document.getElementById(id).value=''); document.getElementById('fBG').value=''; loadStats(); }
+    else toast(d.message,'error');
+  } catch(e){ toast('Failed to add donor','error'); }
+}
+
+// ── Blood Group Stats ──────────────────────────────
+async function loadBloodStats(){
+  try{
+    const r = await fetch(`${API}/api/donors/statistics`);
+    const d = await r.json();
+    if(!d.success) return;
+    const grid = document.getElementById('bgGrid');
+    grid.innerHTML = Object.entries(d.bloodGroupStats).map(([bg,s])=>`
+      <div class="bg-box">
+        <div class="bg-name">${bg}</div>
+        <div class="bg-avail">${s.available}</div>
+        <div style="font-size:.75rem;color:var(--muted)">of ${s.total}</div>
+      </div>`).join('');
+  } catch(e){}
+}
+
+// ── Init ──────────────────────────────
+(async()=>{
+  if(token){
+    const r = await fetch(`${API}/api/auth/verify`,{headers:{'Authorization':`Bearer ${token}`}});
+    const d = await r.json();
+    if(d.success) updateAuthUI(d.user); else { token=null; localStorage.removeItem('token'); }
+  }
+  loadStats();
+})();
+</script>
+</body>
+</html>
