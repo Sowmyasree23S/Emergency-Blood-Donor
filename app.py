@@ -188,6 +188,19 @@ def create_donor():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
+    
+@app.route('/api/donors/<int:donor_id>', methods=['DELETE'], strict_slashes=False)
+def delete_donor(donor_id):
+    donor = Donor.query.get(donor_id)
+    if not donor:
+        return jsonify({'success': False, 'message': 'Donor not found'}), 404
+    try:
+        db.session.delete(donor)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Donor deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/donors/search/nearest', methods=['POST'], strict_slashes=False)
 def find_nearest_donor_api():
